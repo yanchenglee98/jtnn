@@ -1,11 +1,11 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
-from .mol_tree import MolTree
+from mol_tree import MolTree
 import numpy as np
-from .jtnn_enc import JTNNEncoder
-from .mpn import MPN
-from .jtmpn import JTMPN
-import pickle as pickle
+from jtnn_enc import JTNNEncoder
+from mpn import MPN
+from jtmpn import JTMPN
+import cPickle as pickle
 import os, random
 
 class PairTreeFolder(object):
@@ -25,18 +25,18 @@ class PairTreeFolder(object):
     def __iter__(self):
         for fn in self.data_files:
             fn = os.path.join(self.data_folder, fn)
-            with open(fn, 'rb') as f:
+            with open(fn) as f:
                 data = pickle.load(f)
 
             if self.shuffle: 
                 random.shuffle(data) #shuffle data before batch
 
-            batches = [data[i : i + self.batch_size] for i in range(0, len(data), self.batch_size)]
+            batches = [data[i : i + self.batch_size] for i in xrange(0, len(data), self.batch_size)]
             if len(batches[-1]) < self.batch_size:
                 batches.pop()
 
             dataset = PairTreeDataset(batches, self.vocab, self.y_assm)
-            dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=lambda x:x[0])#, num_workers=self.num_workers)
+            dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=self.num_workers, collate_fn=lambda x:x[0])
 
             for b in dataloader:
                 yield b
@@ -60,18 +60,18 @@ class MolTreeFolder(object):
     def __iter__(self):
         for fn in self.data_files:
             fn = os.path.join(self.data_folder, fn)
-            with open(fn, 'rb') as f:
+            with open(fn) as f:
                 data = pickle.load(f)
 
             if self.shuffle: 
                 random.shuffle(data) #shuffle data before batch
 
-            batches = [data[i : i + self.batch_size] for i in range(0, len(data), self.batch_size)]
+            batches = [data[i : i + self.batch_size] for i in xrange(0, len(data), self.batch_size)]
             if len(batches[-1]) < self.batch_size:
                 batches.pop()
 
             dataset = MolTreeDataset(batches, self.vocab, self.assm)
-            dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=lambda x:x[0])#, num_workers=self.num_workers)
+            dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=self.num_workers, collate_fn=lambda x:x[0])
 
             for b in dataloader:
                 yield b
@@ -89,7 +89,7 @@ class PairTreeDataset(Dataset):
         return len(self.data)
     
     def __getitem__(self, idx):
-        batch0, batch1 = list(zip(*self.data[idx]))
+        batch0, batch1 = zip(*self.data[idx])
         return tensorize(batch0, self.vocab, assm=False), tensorize(batch1, self.vocab, assm=self.y_assm)
 
 class MolTreeDataset(Dataset):

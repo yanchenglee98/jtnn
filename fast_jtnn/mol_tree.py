@@ -1,7 +1,9 @@
 import rdkit
 import rdkit.Chem as Chem
-from chemutils import get_clique_mol, tree_decomp, get_mol, get_smiles, set_atommap, enum_assemble, decode_stereo
-from vocab import *
+from .chemutils import get_clique_mol, tree_decomp, get_mol, get_smiles, set_atommap, enum_assemble, decode_stereo
+from .vocab import *
+import sys
+import argparse
 
 class MolTreeNode(object):
 
@@ -52,7 +54,7 @@ class MolTreeNode(object):
         if len(new_cands) > 0: cands = new_cands
 
         if len(cands) > 0:
-            self.cands, _ = zip(*cands)
+            self.cands, _ = list(zip(*cands))
             self.cands = list(self.cands)
         else:
             self.cands = []
@@ -102,25 +104,43 @@ class MolTree(object):
         for node in self.nodes:
             node.assemble()
 
+
 def dfs(node, fa_idx):
     max_depth = 0
     for child in node.neighbors:
-        if child.idx == fa_idx: continue
+        if child.idx == fa_idx:
+            continue
         max_depth = max(max_depth, dfs(child, node.idx))
     return max_depth + 1
 
 
-if __name__ == "__main__":
-    import sys
-    lg = rdkit.RDLogger.logger() 
-    lg.setLevel(rdkit.RDLogger.CRITICAL)
-
+def main_mol_tree(oinput, ovocab, MAX_TREE_WIDTH=50):
     cset = set()
-    for line in sys.stdin:
-        smiles = line.split()[0]
-        mol = MolTree(smiles)
-        for c in mol.nodes:
-            cset.add(c.smiles)
-    for x in cset:
-        print x
+    with open(oinput, 'r') as input_file:
+        for i, line in enumerate(input_file.readlines()):
+            smiles = line.strip().split()[0]
+            alert = False
+            mol = MolTree(smiles)
+            for c in mol.nodes:
+                if c.mol.GetNumAtoms() > MAX_TREE_WIDTH:
+                    alert = True
+                cset.add(c.smiles)
+            if len(mol.nodes) > 1 and alert:
+                sys.stderr.write('[WARNING]: %d-th molecule %s has a high tree-width.\n' % (i + 1, smiles))
+    
+    with open(ovocab, 'w') as vocab_file:
+        for x in cset:
+            vocab_file.write(x+'\n')
 
+
+if __name__ == "__main__":
+    lg = rdkit.RDLogger.logger()
+    lg.setLevel(rdkit.RDLogger.CRITICAL)
+    sys.stderr.write('Running tree decomposition on the dataset')
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input", dest="input")
+    parser.add_argument("-v", "--vocab", dest="vocab")
+    opts = parser.parse_args()
+
+    main_mol_tree(opts.input, opts.vocab)
